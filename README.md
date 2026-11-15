@@ -23,7 +23,8 @@
    - 把 AppGroup.swift、WhitelistStore.swift、ScreenshotAnalyzer.swift 同时加入
      App 和 扩展两个 target 的成员（Build Phases > Compile Sources 勾选）。
 4. 给 **App 和 扩展两个 target** 都添加 capability「App Groups」，
-   Group 名固定为：group.redbooktool（与 AppGroup.swift 中一致）。
+   Group 名固定为：group.com.wenwen1289.RedTool（与 AppGroup.swift 中一致；
+   免费签名请保持此默认命名格式，自定义名容易被拒）。
 5. ContentView.swift 中 broadcastExtensionBundleID 默认为
    主 App BundleID + ".BroadcastExtension"，如扩展命名不同请对应修改。
 6. 真机运行：点 App 内「允许通知提醒」→ 点系统广播图标 → 开始广播 →
@@ -49,3 +50,13 @@
 - iOS 广播会显示系统"红色状态条"提示正在录屏，无法隐藏。
 - 扩展内发通知在部分 iOS 版本可能受限；即使通知未弹出，
   结果仍会写入 App Group，回到 App 即可看到实时表格。
+
+## 日志面板（v1.1 新增）
+
+- App 底部新增「运行日志」面板，与安卓版一致：实时显示扩展识别过程
+  （广播开始/结束、OCR行数、白名单命中详情、通知发送结果、权限状态）。
+- 日志由主 App 与广播扩展共同写入 App Group，5 分钟自动清理，最多保留 500 条。
+- 排查指引：
+  - 无「广播已开始」日志 → 广播未真正启动，或免费签名未带 App Group 权限
+  - 「白名单为空」→ App Group 未同步，实时识别不可用（截图识别不受影响）
+  - 「通知权限: 被拒绝」→ 到 设置-通知-红薯tool 开启允许

@@ -2,7 +2,7 @@
 
 /// 主 App 与 Broadcast 扩展共用的数据通道（App Group）
 enum AppGroup {
-    static let suiteName = "group.redbooktool"
+    static let suiteName = "group.com.wenwen1289.RedTool"
     private static let keyWhitelist = "whitelist_raw"
     private static let keyMatches = "live_matches"
 
@@ -35,7 +35,7 @@ enum AppGroup {
                         overThreshold: $0.overThreshold,
                         entryName: $0.entry.name,
                         entryId: $0.entry.id,
-                        entryThreshold: $0.entry.threshold,
+                        entryThreshold: $0.entryThreshold,
                         timestamp: Date())
         }
         if let data = try? JSONEncoder().encode(stored) {
@@ -54,5 +54,39 @@ enum AppGroup {
                         likeCount: $0.likeCount,
                         overThreshold: $0.overThreshold)
         }
+    }
+}
+
+/// 共享日志（App 与扩展都写入；5 分钟自动清理，最多 500 条）
+enum AppLog {
+    struct Entry: Codable, Identifiable, Equatable {
+        let ts: Date
+        let level: String
+        let msg: String
+        var id: String { "\(ts.timeIntervalSince1970)|\(level)|\(msg)" }
+    }
+
+    private static let key = "app_logs"
+    private static let maxAge: TimeInterval = 5 * 60   // 5 分钟自动清理
+    private static let maxLines = 500
+
+    static func append(_ level: String, _ msg: String) {
+        var list = load()
+        list.append(Entry(ts: Date(), level: level, msg: msg))
+        if let data = try? JSONEncoder().encode(list) {
+            AppGroup.defaults?.set(data, forKey: key)
+        }
+    }
+
+    static func load() -> [Entry] {
+        guard let data = AppGroup.defaults?.data(forKey: key),
+              let list = try? JSONDecoder().decode([Entry].self, from: data) else { return [] }
+        let cutoff = Date().addingTimeInterval(-maxAge)
+        let kept = list.filter { $0.ts >= cutoff }.suffix(maxLines)
+        return Array(kept)
+    }
+
+    static func clear() {
+        AppGroup.defaults?.removeObject(forKey: key)
     }
 }

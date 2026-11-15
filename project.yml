@@ -34,7 +34,7 @@ targets:
       path: Generated/App.entitlements
       properties:
         com.apple.security.application-groups:
-          - group.redbooktool
+          - group.com.wenwen1289.RedTool
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.wenwen1289.RedTool
@@ -59,7 +59,7 @@ targets:
       path: Generated/Ext.entitlements
       properties:
         com.apple.security.application-groups:
-          - group.redbooktool
+          - group.com.wenwen1289.RedTool
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.wenwen1289.RedTool.BroadcastExtension
