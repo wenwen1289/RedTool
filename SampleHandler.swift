@@ -9,10 +9,19 @@ class SampleHandler: RPBroadcastSampleHandler {
 
     private var lastAnalyze = Date.distantPast
     private var notified = Set<String>()
+    /// 广播启动时解析并缓存白名单（App Group 优先，剪贴板兜底）
+    private var whitelist: [WhitelistEntry] = []
 
     override func broadcastStarted(withSetupInfo setupInfo: [String: NSObject]?) {
         notified.removeAll()
         AppLog.append("I", "===== 广播已开始，每 2 秒识别一帧 =====")
+
+        // 白名单来源：App Group → 剪贴板兜底（免费签名无 App Group 时）
+        whitelist = WhitelistStore.parse(AppGroup.loadWhitelistRaw())
+        if whitelist.isEmpty, let pbRaw = AppGroup.loadWhitelistFromPasteboard() {
+            whitelist = WhitelistStore.parse(pbRaw)
+            AppLog.append("I", "白名单来源: 系统剪贴板(免费签名兜底通道)")
+        }
 
         UNUserNotificationCenter.current()
             .requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
@@ -25,10 +34,8 @@ class SampleHandler: RPBroadcastSampleHandler {
             }
         }
 
-        let whitelist = WhitelistStore.parse(AppGroup.loadWhitelistRaw())
         if whitelist.isEmpty {
-            AppLog.append("W", "白名单为空！App Group 未同步，实时识别不可用"
-                + "（免费签名可能未带 App Group 权限，截图识别不受影响）")
+            AppLog.append("W", "白名单为空！请先打开 App 让它写入剪贴板，再重新开始广播")
         } else {
             AppLog.append("I", "白名单已加载 \(whitelist.count) 条")
         }
@@ -54,10 +61,8 @@ class SampleHandler: RPBroadcastSampleHandler {
 
         let lines = ScreenshotAnalyzer.recognizeText(pixelBuffer: pixelBuffer)
 
-        let whitelist = WhitelistStore.parse(AppGroup.loadWhitelistRaw())
         guard !whitelist.isEmpty else {
-            AppLog.append("W", "跳过识别: 白名单为空(App Group 未同步)")
-            return
+            return   // 广播启动时已提示过白名单为空
         }
 
         let matches = ScreenshotAnalyzer.analyze(lines: lines, whitelist: whitelist)

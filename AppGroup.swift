@@ -1,4 +1,5 @@
 ﻿import Foundation
+import UIKit
 
 /// 主 App 与 Broadcast 扩展共用的数据通道（App Group）
 enum AppGroup {
@@ -7,6 +8,24 @@ enum AppGroup {
     private static let keyMatches = "live_matches"
 
     static var defaults: UserDefaults? { UserDefaults(suiteName: suiteName) }
+
+    /// 免费签名可能剥掉 App Group 权限
+    static var groupAvailable: Bool { defaults != nil }
+
+    // ===== 剪贴板兜底通道（无权限要求） =====
+    static let pasteboardPrefix = "REDTOOL_WHITELIST::"
+
+    /// App 侧：把白名单写入系统剪贴板（扩展启动时读取）
+    static func copyWhitelistToPasteboard(_ raw: String) {
+        UIPasteboard.general.string = pasteboardPrefix + raw
+    }
+
+    /// 扩展侧：从剪贴板读取白名单（带前缀校验，避免误读用户剪贴板内容）
+    static func loadWhitelistFromPasteboard() -> String? {
+        guard let s = UIPasteboard.general.string,
+              s.hasPrefix(pasteboardPrefix) else { return nil }
+        return String(s.dropFirst(pasteboardPrefix.count))
+    }
 
     // 白名单
     static func saveWhitelist(_ raw: String) {

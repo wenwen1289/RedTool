@@ -30,9 +30,19 @@ struct ContentView: View {
                     GroupBox("白名单（自动保存）") {
                         TextEditor(text: Binding(
                             get: { whitelistRaw },
-                            set: { whitelistRaw = $0; AppGroup.saveWhitelist($0) }))
+                            set: { whitelistRaw = $0; AppGroup.saveWhitelist($0)
+                                AppGroup.copyWhitelistToPasteboard($0) }))
                             .frame(minHeight: 80)
                             .font(.system(size: 13))
+                    }
+
+                    if !AppGroup.groupAvailable {
+                        Text("⚠️ 检测到 App Group 权限缺失（免费签名常见）。"
+                            + "实时识别将通过【系统剪贴板】传递白名单，"
+                            + "命中结果以【通知】形式提醒；"
+                            + "App 内实时表格/日志将不显示，请使用截图识别查看结果。")
+                            .font(.footnote)
+                            .foregroundColor(.orange)
                     }
 
                     // ===== 实时识别（屏幕广播 + 通知提醒） =====
@@ -75,11 +85,15 @@ struct ContentView: View {
             .onAppear {
                 // 每秒从 App Group 读扩展写入的实时结果与日志
                 liveTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-                    let live = AppGroup.loadMatches()
-                    if !live.isEmpty { results = live }
+                    if AppGroup.groupAvailable {
+                        let live = AppGroup.loadMatches()
+                        if !live.isEmpty { results = live }
+                    }
                     logs = AppLog.load()
                 }
-                AppLog.append("I", "App 已打开，白名单已同步到共享存储")
+                // 白名单写入剪贴板（免费签名时扩展的兜底来源）
+                AppGroup.copyWhitelistToPasteboard(whitelistRaw)
+                AppLog.append("I", "App 已打开，白名单已写入剪贴板兜底通道")
             }
             .onDisappear { liveTimer?.invalidate() }
             .onChange(of: pickedItem) { newItem in
@@ -125,8 +139,10 @@ struct ContentView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 2) {
                             if logs.isEmpty {
-                                Text("暂无日志。开始广播后这里会实时显示识别过程；"
-                                    + "若无「广播已开始」日志，说明广播未真正启动或 App Group 权限缺失。")
+                                Text(AppGroup.groupAvailable
+                                    ? "暂无日志。开始广播后这里会实时显示识别过程。"
+                                    : "App Group 权限缺失（免费签名）：扩展日志无法传回本面板，"
+                                    + "实时识别改走剪贴板通道，命中结果以通知提醒。")
                                     .font(.caption).foregroundStyle(.secondary)
                             }
                             ForEach(logs) { entry in
