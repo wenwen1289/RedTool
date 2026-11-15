@@ -1,0 +1,73 @@
+﻿name: RedBookTool
+options:
+  bundleIdPrefix: com.wenwen1289
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  RedBookTool:
+    type: application
+    platform: iOS
+    sources:
+      - path: .
+        excludes:
+          - "SampleHandler.swift"
+          - "project.yml"
+          - ".github"
+          - "Generated"
+          - "README.md"
+          - "*.ipa"
+    dependencies:
+      - target: BroadcastExtension
+    info:
+      path: Generated/Info.plist
+      properties:
+        CFBundleDisplayName: 红薯tool
+        NSPhotoLibraryUsageDescription: 用于选取小红书截图并识别白名单博主
+        UILaunchScreen: {}
+    entitlements:
+      path: Generated/App.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.redbooktool
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.wenwen1289.RedTool
+        TARGETED_DEVICE_FAMILY: "1,2"
+  BroadcastExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - SampleHandler.swift
+      - AppGroup.swift
+      - WhitelistStore.swift
+      - ScreenshotAnalyzer.swift
+    info:
+      path: Generated/ExtInfo.plist
+      properties:
+        CFBundleDisplayName: RedTool广播
+        CFBundlePackageType: XPC!
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.broadcast-services-upload
+          NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).SampleHandler"
+    entitlements:
+      path: Generated/Ext.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.redbooktool
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.wenwen1289.RedTool.BroadcastExtension
+schemes:
+  RedBookTool:
+    build:
+      targets:
+        RedBookTool: all
+        BroadcastExtension: [archive]
+    archive:
+      config: Release
