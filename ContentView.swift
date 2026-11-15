@@ -3,10 +3,13 @@ import PhotosUI
 import UserNotifications
 
 struct ContentView: View {
-    @State private var whitelistRaw: String =
-        UserDefaults.standard.string(forKey: "whitelist_raw")
-            ?? AppGroup.loadWhitelistRaw()
-            ?? "[\"彩云滚滚lai:wmn525545100:600\"]"
+    @State private var whitelistRaw: String = {
+        if let saved = UserDefaults.standard.string(forKey: "whitelist_raw"), !saved.isEmpty {
+            return saved
+        }
+        let shared = AppGroup.loadWhitelistRaw()
+        return shared.isEmpty ? "[\"彩云滚滚lai:wmn525545100:600\"]" : shared
+    }()
     @AppStorage("show_over") private var showOver: Bool = true
 
     @State private var results: [MatchResult] = []
@@ -127,7 +130,7 @@ struct ContentView: View {
                                     .font(.caption).foregroundStyle(.secondary)
                             }
                             ForEach(logs) { entry in
-                                Text("\(Self.fmt(entry.ts)) \(entry.level)/\(entry.msg)")
+                                Text(logLine(entry))
                                     .font(.system(size: 10, design: .monospaced))
                                     .foregroundColor(color(for: entry.level))
                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -159,6 +162,25 @@ struct ContentView: View {
         case "W": return .orange
         default: return .primary
         }
+    }
+
+    /// 单条匹配记录（格式与 Android 版一致）
+    private func rowView(_ m: MatchResult) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("\(m.displayName) \(m.likeCount)赞（\(m.overThreshold ? "超阈值" : "未超阈值")）")
+                .font(.callout).bold()
+            Text("白名单: \(m.entry.name) · id: \(m.entry.id) · 阈值: \(m.entry.threshold)")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemBackground))
+        .cornerRadius(8)
+    }
+
+    /// 日志行文本（拆开表达式，避免类型检查超时）
+    private func logLine(_ entry: AppLog.Entry) -> String {
+        Self.fmt.string(from: entry.ts) + " " + entry.level + "/" + entry.msg
     }
 
     private static let fmt: DateFormatter = {
