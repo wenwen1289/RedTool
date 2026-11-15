@@ -59,13 +59,13 @@ class SampleHandler: RPBroadcastSampleHandler {
             return
         }
 
-        let lines = ScreenshotAnalyzer.recognizeText(pixelBuffer: pixelBuffer)
+        let lines = CardAnalyzer.recognizeText(pixelBuffer: pixelBuffer)
 
         guard !whitelist.isEmpty else {
             return   // 广播启动时已提示过白名单为空
         }
 
-        let matches = ScreenshotAnalyzer.analyze(lines: lines, whitelist: whitelist)
+        let matches = CardAnalyzer.analyze(lines: lines, whitelist: whitelist)
         AppGroup.saveMatches(matches)   // 主 App 打开时可直接看到实时表格
 
         let below = matches.filter { !$0.overThreshold }

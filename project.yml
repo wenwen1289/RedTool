@@ -17,6 +17,7 @@ targets:
       - path: .
         excludes:
           - "SampleHandler.swift"
+          - "CardAnalyzer.swift"
           - "project.yml"
           - ".github"
           - "Generated"
@@ -46,7 +47,7 @@ targets:
       - SampleHandler.swift
       - AppGroup.swift
       - WhitelistStore.swift
-      - ScreenshotAnalyzer.swift
+      - CardAnalyzer.swift
     info:
       path: Generated/ExtInfo.plist
       properties:

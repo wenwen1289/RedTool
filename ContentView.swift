@@ -1,5 +1,4 @@
 ﻿import SwiftUI
-import PhotosUI
 import UserNotifications
 
 struct ContentView: View {
@@ -13,13 +12,10 @@ struct ContentView: View {
     @AppStorage("show_over") private var showOver: Bool = true
 
     @State private var results: [MatchResult] = []
-    @State private var analyzing = false
-    @State private var statusText = "两种方式：选截图识别，或开启实时识别（通知提醒）"
-    @State private var pickedItem: PhotosPickerItem?
+    @State private var statusText = "开始屏幕广播后进入小红书，命中白名单会收到通知"
     @State private var liveTimer: Timer?
     @State private var logs: [AppLog.Entry] = []
 
-    /// Broadcast 扩展的 Bundle ID（按你的工程实际填写）
     private let broadcastExtensionBundleID =
         Bundle.main.bundleIdentifier! + ".BroadcastExtension"
 
@@ -37,22 +33,22 @@ struct ContentView: View {
                     }
 
                     if !AppGroup.groupAvailable {
-                        Text("⚠️ 检测到 App Group 权限缺失（免费签名常见）。"
-                            + "实时识别将通过【系统剪贴板】传递白名单，"
-                            + "命中结果以【通知】形式提醒；"
-                            + "App 内实时表格/日志将不显示，请使用截图识别查看结果。")
+                        Text("⚠️ App Group 权限缺失（免费签名常见）。实时识别将通过"
+                            + "【系统剪贴板】传递白名单，命中结果以【通知】提醒；"
+                            + "App 内实时表格/日志将不显示。")
                             .font(.footnote)
                             .foregroundColor(.orange)
                     }
 
-                    // ===== 实时识别（屏幕广播 + 通知提醒） =====
-                    GroupBox("实时识别（推荐）") {
+                    GroupBox("实时识别") {
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {
                                 BroadcastPickerButton(
                                     preferredExtensionBundleID: broadcastExtensionBundleID)
                                     .frame(width: 44, height: 44)
-                                Text("点击图标 → 选「RedTool」→ 开始广播\n在小红书滚动，命中白名单会发通知")
+                                Text("① 先回到本页让白名单写入剪贴板\n"
+                                    + "② 点图标 -> 选「RedTool」-> 开始广播\n"
+                                    + "③ 进入小红书滚动，命中白名单发通知")
                                     .font(.footnote).foregroundStyle(.secondary)
                             }
                             Button("允许通知提醒") {
@@ -62,28 +58,16 @@ struct ContentView: View {
                         }
                     }
 
-                    // ===== 截图识别 =====
-                    GroupBox("截图识别") {
-                        HStack {
-                            PhotosPicker(selection: $pickedItem, matching: .images) {
-                                Label("选择截图", systemImage: "photo.on.rectangle")
-                            }
-                            if analyzing { ProgressView().padding(.leading, 6) }
-                        }
-                    }
-
                     Text(statusText).font(.footnote).foregroundStyle(.secondary)
 
                     if !results.isEmpty { resultTables }
 
-                    // ===== 实时日志面板（与安卓版一致，5 分钟自动清理） =====
                     logPanel
                 }
                 .padding()
             }
             .navigationTitle("红薯tool")
             .onAppear {
-                // 每秒从 App Group 读扩展写入的实时结果与日志
                 liveTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
                     if AppGroup.groupAvailable {
                         let live = AppGroup.loadMatches()
@@ -91,15 +75,10 @@ struct ContentView: View {
                     }
                     logs = AppLog.load()
                 }
-                // 白名单写入剪贴板（免费签名时扩展的兜底来源）
                 AppGroup.copyWhitelistToPasteboard(whitelistRaw)
                 AppLog.append("I", "App 已打开，白名单已写入剪贴板兜底通道")
             }
             .onDisappear { liveTimer?.invalidate() }
-            .onChange(of: pickedItem) { newItem in
-                guard let item = newItem else { return }
-                analyze(item: item)
-            }
         }
     }
 
@@ -141,8 +120,8 @@ struct ContentView: View {
                             if logs.isEmpty {
                                 Text(AppGroup.groupAvailable
                                     ? "暂无日志。开始广播后这里会实时显示识别过程。"
-                                    : "App Group 权限缺失（免费签名）：扩展日志无法传回本面板，"
-                                    + "实时识别改走剪贴板通道，命中结果以通知提醒。")
+                                    : "App Group 权限缺失（免费签名）：扩展日志无法传回，"
+                                    + "实时识别走剪贴板通道，命中结果以通知提醒。")
                                     .font(.caption).foregroundStyle(.secondary)
                             }
                             ForEach(logs) { entry in
@@ -213,43 +192,6 @@ struct ContentView: View {
                     AppLog.append("E", "通知权限申请失败: \(error.localizedDescription)")
                 } else {
                     AppLog.append("I", "通知权限: \(granted ? "已授权" : "被拒绝(请到 设置-通知 开启)")")
-                }
-            }
-        }
-    }
-
-    private func analyze(item: PhotosPickerItem) {
-        analyzing = true
-        statusText = "识别中…"
-        item.loadTransferable(type: Data.self) { result in
-            DispatchQueue.main.async {
-                defer { analyzing = false }
-                switch result {
-                case .success(let data?):
-                    guard let img = UIImage(data: data),
-                          let cg = img.cgImage else {
-                        statusText = "截图读取失败"; return
-                    }
-                    let list = WhitelistStore.parse(whitelistRaw)
-                    AppLog.append("I", "白名单解析: \(list.count) 条")
-                    guard !list.isEmpty else {
-                        statusText = "白名单为空或格式错误"; return
-                    }
-                    let lines = ScreenshotAnalyzer.recognizeText(cgImage: cg)
-                    AppLog.append("I", "OCR完成: 共\(lines.count)行")
-                    for (i, l) in lines.prefix(20).enumerated() {
-                        AppLog.append("I", "OCR[\(i)] \(l)")
-                    }
-                    let matched = ScreenshotAnalyzer.analyze(lines: lines, whitelist: list)
-                    results = matched
-                    statusText = matched.isEmpty
-                        ? "截图内未识别到匹配内容（OCR原始行见下方日志）"
-                        : "识别完成：达标 \(matched.filter { !$0.overThreshold }.count) 条，阈值外 \(matched.filter { $0.overThreshold }.count) 条"
-                    AppLog.append("I", "截图识别完成: 命中 \(matched.count) 条")
-                case .failure(let err):
-                    statusText = "读取失败: \(err.localizedDescription)"
-                default:
-                    statusText = "未获取到图片"
                 }
             }
         }

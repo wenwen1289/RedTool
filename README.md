@@ -20,7 +20,7 @@
 3. File > New > Target > Broadcast Upload Extension：
    - Name 填 BroadcastExtension，语言 Swift，不勾选 UI Extension。
    - 用本目录的 SampleHandler.swift **替换**扩展自动生成的同名文件。
-   - 把 AppGroup.swift、WhitelistStore.swift、ScreenshotAnalyzer.swift 同时加入
+   - 把 AppGroup.swift、WhitelistStore.swift、CardAnalyzer.swift 同时加入
      App 和 扩展两个 target 的成员（Build Phases > Compile Sources 勾选）。
 4. 给 **App 和 扩展两个 target** 都添加 capability「App Groups」，
    Group 名固定为：group.com.wenwen1289.RedTool（与 AppGroup.swift 中一致；
