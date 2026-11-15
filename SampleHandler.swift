@@ -9,7 +9,7 @@ class SampleHandler: RPBroadcastSampleHandler {
     private var lastAnalyze = Date.distantPast
     private var notified = Set<String>()
 
-    override func broadcastStarted(withSetupInfo setupInfo: [String: Any]?) {
+    override func broadcastStarted(withSetupInfo setupInfo: [String: NSObject]?) {
         notified.removeAll()
         UNUserNotificationCenter.current()
             .requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
