@@ -35,7 +35,7 @@ enum AppGroup {
                         overThreshold: $0.overThreshold,
                         entryName: $0.entry.name,
                         entryId: $0.entry.id,
-                        entryThreshold: $0.entryThreshold,
+                        entryThreshold: $0.entry.threshold,
                         timestamp: Date())
         }
         if let data = try? JSONEncoder().encode(stored) {
