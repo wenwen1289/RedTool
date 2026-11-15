@@ -226,17 +226,24 @@ struct ContentView: View {
                 defer { analyzing = false }
                 switch result {
                 case .success(let data?):
-                    guard let img = UIImage(data: data) else {
+                    guard let img = UIImage(data: data),
+                          let cg = img.cgImage else {
                         statusText = "截图读取失败"; return
                     }
                     let list = WhitelistStore.parse(whitelistRaw)
+                    AppLog.append("I", "白名单解析: \(list.count) 条")
                     guard !list.isEmpty else {
                         statusText = "白名单为空或格式错误"; return
                     }
-                    let matched = ScreenshotAnalyzer.analyze(image: img, whitelist: list)
+                    let lines = ScreenshotAnalyzer.recognizeText(cgImage: cg)
+                    AppLog.append("I", "OCR完成: 共\(lines.count)行")
+                    for (i, l) in lines.prefix(20).enumerated() {
+                        AppLog.append("I", "OCR[\(i)] \(l)")
+                    }
+                    let matched = ScreenshotAnalyzer.analyze(lines: lines, whitelist: list)
                     results = matched
                     statusText = matched.isEmpty
-                        ? "截图内未识别到匹配内容"
+                        ? "截图内未识别到匹配内容（OCR原始行见下方日志）"
                         : "识别完成：达标 \(matched.filter { !$0.overThreshold }.count) 条，阈值外 \(matched.filter { $0.overThreshold }.count) 条"
                     AppLog.append("I", "截图识别完成: 命中 \(matched.count) 条")
                 case .failure(let err):

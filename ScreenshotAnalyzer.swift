@@ -34,8 +34,8 @@ enum ScreenshotAnalyzer {
         return match(candidates: candidates, whitelist: whitelist)
     }
 
-    /// 实时帧 OCR（Broadcast 扩展）
-    static func recognizeText(pixelBuffer: CVPixelBuffer) -> [String] {
+    /// 静态图 OCR（主 App 截图识别用，供日志输出原始行）
+    static func recognizeText(cgImage: CGImage) -> [String] {
         var results: [String] = []
         let request = VNRecognizeTextRequest { req, _ in
             guard let obs = req.results as? [VNRecognizedTextObservation] else { return }
@@ -75,33 +75,61 @@ enum ScreenshotAnalyzer {
 
     // MARK: - 提取候选（名称 + 点赞数）
 
+    /// 纯数字点赞行（小红书 feed 卡片：作者名与点赞数是两行，数字行不带"赞"字）
+    private static let pureCountPattern = try! NSRegularExpression(
+        pattern: "^([0-9][0-9,.]*)\\s*(万|[wW])?\\+?$")
+
     private static func extractCandidates(from lines: [String]) -> [Candidate] {
         var out: [Candidate] = []
         var seen = Set<String>()
+        var prevName: String?
 
-        for line in lines {
-            let s = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard s.count <= 100 else { continue }
+        for raw in lines {
+            let s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !s.isEmpty, s.count <= 100 else { continue }
 
+            // 卡片描述：……来自 作者 N赞
             if let m = cardPattern.firstMatch(in: s, range: NSRange(s.startIndex..., in: s)),
                let name = group(m, 1, in: s), let cnt = group(m, 2, in: s) {
                 add(name: name, raw: cnt, wan: group(m, 3, in: s), out: &out, seen: &seen)
+                prevName = nil
                 continue
             }
+            // 同一行：作者名 N赞
             if let m = likePattern.firstMatch(in: s, range: NSRange(s.startIndex..., in: s)),
                let name = group(m, 1, in: s), let cnt = group(m, 2, in: s) {
                 add(name: name, raw: cnt, wan: group(m, 3, in: s), out: &out, seen: &seen)
+                prevName = nil
+                continue
+            }
+            // 两行结构：上一行作者名 + 本行纯数字（可带万/w/+）
+            if let m = pureCountPattern.firstMatch(in: s, range: NSRange(s.startIndex..., in: s)),
+               let cnt = group(m, 1, in: s), let name = prevName {
+                add(name: name, raw: cnt, wan: group(m, 2, in: s), out: &out, seen: &seen)
+                prevName = nil
+                continue
+            }
+            // 记录可能的作者名（短文本、非纯数字、非噪声）
+            if s.count <= 30, !isNoise(s), pureCountPattern.firstMatch(
+                in: s, range: NSRange(s.startIndex..., in: s)) == nil {
+                prevName = s
+            } else {
+                prevName = nil
             }
         }
         return out
+    }
+
+    private static func isNoise(_ name: String) -> Bool {
+        let noise = ["笔记", "视频", "图文", "直播", "来自", "赞", "小红书", "关注", "搜索"]
+        return noise.contains(where: { name.contains($0) })
     }
 
     private static func add(name rawName: String, raw: String, wan: String?,
                             out: inout [Candidate], seen: inout Set<String>) {
         let name = rawName.trimmingCharacters(in: .whitespaces)
         guard !name.isEmpty else { return }
-        let noise = ["笔记", "视频", "图文", "直播", "来自", "赞"]
-        if noise.contains(where: { name.contains($0) }) { return }
+        if isNoise(name) { return }
         guard !seen.contains(name) else { return }
         seen.insert(name)
         out.append(Candidate(name: name, likeCount: parseCount(raw: raw, wan: wan)))
